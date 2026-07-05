@@ -97,7 +97,10 @@ function CandlestickChartComponent({
   const contextOverlaysRef = useRef(contextOverlays);
   const setupsRef = useRef(setups);
   const showSetupOverlaysRef = useRef(showSetupOverlays);
+  const followLatestRef = useRef(true);
+  const isProgrammaticRangeChangeRef = useRef(false);
   const [tooltip, setTooltip] = useState<TooltipCandle | null>(null);
+  const [isFollowingLive, setIsFollowingLive] = useState(true);
   const [analysisZone, setAnalysisZone] = useState<{
     left: number;
     width: number;
@@ -182,6 +185,45 @@ function CandlestickChartComponent({
       })),
     [candles],
   );
+  const applyVisibleRange = useCallback((range: { from: Time; to: Time }) => {
+    const chart = chartRef.current;
+    if (!chart) {
+      return;
+    }
+
+    isProgrammaticRangeChangeRef.current = true;
+    chart.timeScale().setVisibleRange(range);
+    window.requestAnimationFrame(() => {
+      isProgrammaticRangeChangeRef.current = false;
+    });
+  }, []);
+
+  const goToLatest = useCallback(() => {
+    if (!chartRef.current || chartData.length === 0) {
+      return;
+    }
+
+    const lastIndex = chartData.length - 1;
+    const fromIndex = Math.max(0, lastIndex - Math.min(120, Math.max(40, lastIndex)));
+    applyVisibleRange({
+      from: chartData[fromIndex].time,
+      to: chartData[lastIndex].time,
+    });
+  }, [applyVisibleRange, chartData]);
+
+  const isNearRightEdge = useCallback((range: { from: Time; to: Time } | null) => {
+    if (!range || chartData.length < 2) {
+      return false;
+    }
+
+    const latest = chartData[chartData.length - 1];
+    const previous = chartData[chartData.length - 2];
+    const tolerance = Math.max(60, Math.abs(Number(latest.time) - Number(previous.time)) * 2);
+    const latestTime = Number(latest.time);
+    const rightEdgeTime = Number(range.to);
+    return Number.isFinite(rightEdgeTime) && rightEdgeTime >= latestTime - tolerance;
+  }, [chartData]);
+
   const markerMap = useMemo(
     () => new Map(markers.map((marker) => [marker.id, marker])),
     [markers],
@@ -326,6 +368,12 @@ function CandlestickChartComponent({
         return;
       }
 
+      if (!isProgrammaticRangeChangeRef.current) {
+        const nearRightEdge = isNearRightEdge(range);
+        followLatestRef.current = nearRightEdge;
+        setIsFollowingLive(nearRightEdge);
+      }
+
       onVisibleRangeChange(
         `${formatChartTime(range.from)} - ${formatChartTime(range.to)}`,
       );
@@ -340,7 +388,7 @@ function CandlestickChartComponent({
       markerPluginRef.current = null;
       priceLinesRef.current = [];
     };
-  }, [onMarkerHover, onSignalHover, onVisibleRangeChange, updateAnalysisZone, updateContextBands, updateSetupBands]);
+  }, [isNearRightEdge, onMarkerHover, onSignalHover, onVisibleRangeChange, updateAnalysisZone, updateContextBands, updateSetupBands]);
 
   useEffect(() => {
     if (!seriesRef.current) {
@@ -350,12 +398,16 @@ function CandlestickChartComponent({
     seriesRef.current.setData(chartData);
 
     if (chartData.length > 0) {
-      chartRef.current?.timeScale().fitContent();
-      window.requestAnimationFrame(updateAnalysisZone);
-      window.requestAnimationFrame(updateContextBands);
-      window.requestAnimationFrame(updateSetupBands);
+      window.requestAnimationFrame(() => {
+        if (followLatestRef.current) {
+          goToLatest();
+        }
+        window.requestAnimationFrame(updateAnalysisZone);
+        window.requestAnimationFrame(updateContextBands);
+        window.requestAnimationFrame(updateSetupBands);
+      });
     }
-  }, [chartData, updateAnalysisZone, updateContextBands, updateSetupBands]);
+  }, [chartData, goToLatest, updateAnalysisZone, updateContextBands, updateSetupBands]);
 
   useEffect(() => {
     markerPluginRef.current?.setMarkers(seriesMarkers);
@@ -374,11 +426,11 @@ function CandlestickChartComponent({
     const signalIndex = lowerBoundCandleIndex(candles, signal.timestamp);
     const fromIndex = Math.max(0, signalIndex - 12);
     const toIndex = Math.min(candles.length - 1, signalIndex + 12);
-    chartRef.current.timeScale().setVisibleRange({
+    applyVisibleRange({
       from: Math.floor(candles[fromIndex].timestamp / 1000) as UTCTimestamp,
       to: Math.floor(candles[toIndex].timestamp / 1000) as UTCTimestamp,
     });
-  }, [candles, selectedSignalId, signals]);
+  }, [applyVisibleRange, candles, selectedSignalId, signals]);
 
   useEffect(() => {
     if (!selectedBacktestTradeId || !chartRef.current || candles.length === 0) {
@@ -392,11 +444,11 @@ function CandlestickChartComponent({
 
     const fromIndex = Math.max(0, trade.entryIndex - 12);
     const toIndex = Math.min(candles.length - 1, (trade.exitIndex ?? trade.entryIndex) + 12);
-    chartRef.current.timeScale().setVisibleRange({
+    applyVisibleRange({
       from: Math.floor(candles[fromIndex].timestamp / 1000) as UTCTimestamp,
       to: Math.floor(candles[toIndex].timestamp / 1000) as UTCTimestamp,
     });
-  }, [backtestTrades, candles, selectedBacktestTradeId]);
+  }, [applyVisibleRange, backtestTrades, candles, selectedBacktestTradeId]);
 
   useEffect(() => {
     if (!seriesRef.current) {
@@ -537,17 +589,30 @@ function CandlestickChartComponent({
             </p>
           ) : null}
         </div>
-        {tooltip ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-700 sm:grid-cols-5">
-            <span className="font-medium text-slate-900">{tooltip.time}</span>
-            <span>O {formatPrice(tooltip.open)}</span>
-            <span>H {formatPrice(tooltip.high)}</span>
-            <span>L {formatPrice(tooltip.low)}</span>
-            <span>C {formatPrice(tooltip.close)}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-slate-500">OHLC</span>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              followLatestRef.current = true;
+              setIsFollowingLive(true);
+              goToLatest();
+            }}
+            className={`rounded border px-2.5 py-1 text-[11px] font-semibold transition ${isFollowingLive ? "border-cyan-600 bg-cyan-50 text-cyan-700" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
+          >
+            {isFollowingLive ? "Following live" : "Go live"}
+          </button>
+          {tooltip ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-700 sm:grid-cols-5">
+              <span className="font-medium text-slate-900">{tooltip.time}</span>
+              <span>O {formatPrice(tooltip.open)}</span>
+              <span>H {formatPrice(tooltip.high)}</span>
+              <span>L {formatPrice(tooltip.low)}</span>
+              <span>C {formatPrice(tooltip.close)}</span>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-500">OHLC</span>
+          )}
+        </div>
       </div>
 
       <div className="relative min-h-[660px] flex-1">

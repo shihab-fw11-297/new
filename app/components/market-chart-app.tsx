@@ -542,7 +542,7 @@ export function MarketChartApp() {
               {loading ? "Fetching" : "Fetch"}
             </button>
           </div>
-          <div className="mt-3 grid gap-3 sm:max-w-xs">
+          {/* <div className="mt-3 grid gap-3 sm:max-w-xs">
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Display timezone
               <select
@@ -557,7 +557,7 @@ export function MarketChartApp() {
                 ))}
               </select>
             </label>
-          </div>
+          </div> */}
         </section>
 
         <section className="grid gap-4 border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_1fr]">
