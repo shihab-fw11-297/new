@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/release-next-port.mjs 3015",
-    "dev": "next dev --port 3015",
+    "predev": "node scripts/release-next-port.mjs 3000",
+    "dev": "next dev --port 3000",
     "build": "next build",
     "prestart": "node scripts/release-next-port.mjs 3000 && next build",
     "start": "next start",
