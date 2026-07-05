@@ -602,13 +602,6 @@ export function MarketChartApp() {
           onOverlaysVisibleChange={setShowSetupOverlays}
         />
 
-        <SignalDebugPanel
-          result={entrySignals}
-          selectedSignal={activeSelectedSignal}
-          cacheStatusLabel={hasHydrated ? entrySignals.audit.cacheStatus : "-"}
-          generationTimeLabel={hasHydrated ? entrySignals.audit.generationTimeMs.toFixed(2) : "-"}
-        />
-
         <SignalFunnelPanel funnel={signalFunnel} />
 
         <SignalHistoryTable
