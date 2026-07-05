@@ -619,16 +619,7 @@ export function MarketChartApp() {
           onSignalSelect={handleSignalSelect}
         />
 
-        <BacktestDashboard
-          result={backtestResult}
-          settings={backtestSettings}
-          hydrated={hasHydrated}
-          selectedTradeId={activeSelectedBacktestTrade?.tradeId ?? null}
-          onSettingsChange={handleBacktestSettingsChange}
-          onTradeSelect={handleBacktestTradeSelect}
-        />
-
-        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)] xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)]">
           <div className="w-full min-w-0 flex-1 overflow-hidden rounded border border-slate-200 bg-white">
             <CandlestickChart
               candles={displayCandles}
@@ -654,18 +645,16 @@ export function MarketChartApp() {
               onVisibleRangeChange={handleVisibleRangeChange}
             />
           </div>
-
-          <div className="flex flex-col gap-4">
-            <CandleReadingPanel reading={candleReading} />
-            <MarkerTooltipPanel marker={selectedMarker} />
-            <PhaseTwoAuditPanel audit={marketStructure.audit} />
-            <DataAuditPanel
-              auditInfo={auditInfo}
-              rawCandlesCount={rawCandles.length}
-              chartCandlesCount={chartCandles.length}
-            />
-          </div>
         </div>
+
+        <BacktestDashboard
+          result={backtestResult}
+          settings={backtestSettings}
+          hydrated={hasHydrated}
+          selectedTradeId={activeSelectedBacktestTrade?.tradeId ?? null}
+          onSettingsChange={handleBacktestSettingsChange}
+          onTradeSelect={handleBacktestTradeSelect}
+        />
       </div>
     </main>
   );
