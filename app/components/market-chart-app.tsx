@@ -602,8 +602,6 @@ export function MarketChartApp() {
           onOverlaysVisibleChange={setShowSetupOverlays}
         />
 
-        <SignalFunnelPanel funnel={signalFunnel} />
-
         <SignalHistoryTable
           signals={entrySignals.signals}
           symbol={form.symbol.trim().toUpperCase()}
