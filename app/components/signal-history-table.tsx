@@ -99,7 +99,7 @@ function SignalHistoryTableComponent({
         <table className="min-w-[1500px] w-full border-collapse text-left text-xs">
           <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
             <tr>
-              {["Date/time", "Symbol", "Timeframe", "Mode", "Signal type", "Direction", "Entry", "SL", "TP1", "TP2", "TP3", "RR", "Score", "Confidence", "Session", "Setup type", "Strategy model", "Status", "Reason", "Warnings"].map((header) => (
+              {["Date/time", "Symbol", "Timeframe", "Mode", "Signal type", "Direction", "Entry", "SL", "TP1", "TP2", "TP3", "RR", "Score", "Confidence", "Session", "Setup type", "Strategy model", "Status", "Reason"].map((header) => (
                 <th key={header} className="border-b border-slate-200 px-3 py-2 font-semibold">{header}</th>
               ))}
             </tr>
@@ -130,7 +130,6 @@ function SignalHistoryTableComponent({
                 <Cell>{signal.strategyModel}</Cell>
                 <Cell>{signal.status}</Cell>
                 <Cell>{signal.reasons[0] ?? "-"}</Cell>
-                <Cell>{signal.warnings.join("; ") || "-"}</Cell>
               </tr>
             ))}
           </tbody>

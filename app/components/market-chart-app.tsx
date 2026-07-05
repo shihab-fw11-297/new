@@ -712,11 +712,33 @@ function MarkerControls({
   onShowTooltipsChange: (value: boolean) => void;
   onLiveModeChange: (value: boolean) => void;
 }) {
+  const visibilityKeys = Object.keys(visibility) as Array<keyof typeof visibility>;
+  const allChecked = Object.values(visibility).every(Boolean);
+  const anyChecked = Object.values(visibility).some(Boolean);
+  const allRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (allRef.current) {
+      allRef.current.indeterminate = !allChecked && anyChecked;
+    }
+  }, [allChecked, anyChecked]);
+
+  const toggleAll = () => {
+    const next = Object.fromEntries(visibilityKeys.map((k) => [k, !allChecked])) as typeof visibility;
+    onVisibilityChange(next);
+  };
+
   return (
     <div>
       <h2 className="text-sm font-semibold uppercase tracking-normal text-slate-700">
         Marker Controls
       </h2>
+      <div className="mt-2">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input ref={allRef} type="checkbox" checked={allChecked} onChange={toggleAll} />
+          All markers
+        </label>
+      </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           Sensitivity
