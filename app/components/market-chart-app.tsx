@@ -9,7 +9,6 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { BacktestDashboard } from "@/app/components/backtest-dashboard";
 import { CandleReadingPanel } from "@/app/components/candle-reading-panel";
 import { CandlestickChart } from "@/app/components/candlestick-chart";
 import { MarketContextDashboard } from "@/app/components/market-context-dashboard";
@@ -52,15 +51,14 @@ import type { ContextOverlayVisibility } from "@/lib/market-context/types";
 import { scanSetups } from "@/lib/setup-scanner/engine";
 import { generateHistoricalSignals } from "@/lib/entry-engine/engine";
 import type { EntryMode, TradeSignal } from "@/lib/entry-engine/types";
-import { getDefaultBacktestSettings, runBacktest } from "@/lib/backtesting/engine";
-import type { BacktestSettings, BacktestTrade } from "@/lib/backtesting/types";
+import { runBacktest } from "@/lib/backtesting/engine";
+import type { BacktestTrade } from "@/lib/backtesting/types";
 import { buildSignalFunnel } from "@/lib/signal-funnel/engine";
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h"];
 const SENSITIVITIES: MarkerSensitivity[] = ["low", "normal", "high"];
 const REPLAY_SPEEDS: ReplayState["speed"][] = [1, 2, 5, 10];
 const ENTRY_MODES: EntryMode[] = ["CALIBRATION", "EASY_SCALP", "NORMAL_SCALP", "PRO_TRADER"];
-const BACKTEST_SIGNAL_MODES: BacktestSettings["signalMode"][] = ENTRY_MODES;
 const DISPLAY_TIMEZONES = [
   "UTC",
   "Asia/Kolkata",
@@ -120,10 +118,6 @@ export function MarketChartApp() {
   const [maxRiskAmount, setMaxRiskAmount] = useState(100);
   const [showSignalOverlays, setShowSignalOverlays] = useState(true);
   const [selectedSignal, setSelectedSignal] = useState<TradeSignal | null>(null);
-  const [backtestSettings, setBacktestSettings] = useState<BacktestSettings>(() => ({
-    ...getDefaultBacktestSettings(),
-    signalMode: "CALIBRATION",
-  }));
   const [selectedBacktestTrade, setSelectedBacktestTrade] = useState<BacktestTrade | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<MarketMarker | null>(null);
   const [replay, setReplay] = useState<ReplayState>({
@@ -288,10 +282,10 @@ export function MarketChartApp() {
       timeframe: form.timeframe,
       startDate: form.startDate,
       endDate: form.endDate,
-      settings: backtestSettings,
+      settings: { signalMode: entryMode },
       marketRegime: marketContext.regime.regime,
     }),
-    [backtestSettings, displayCandles, entrySignals.rejectedSetups, entrySignals.signals, form.endDate, form.startDate, form.symbol, form.timeframe, marketContext.regime.regime],
+    [displayCandles, entryMode, entrySignals.rejectedSetups, entrySignals.signals, form.endDate, form.startDate, form.symbol, form.timeframe, marketContext.regime.regime],
   );
   const activeSelectedBacktestTrade = selectedBacktestTrade && backtestResult.tradeMap.has(selectedBacktestTrade.tradeId)
     ? selectedBacktestTrade
@@ -322,15 +316,6 @@ export function MarketChartApp() {
   const handleSignalSelect = useCallback((signal: TradeSignal) => {
     setSelectedSignal(signal);
   }, []);
-  const handleBacktestSettingsChange = useCallback((settings: BacktestSettings) => {
-    setBacktestSettings(settings);
-    setEntryMode(settings.signalMode);
-  }, []);
-  const handleBacktestTradeSelect = useCallback((trade: BacktestTrade) => {
-    setSelectedBacktestTrade(trade);
-    const signal = entrySignals.signalMap.get(trade.signalId);
-    if (signal) setSelectedSignal(signal);
-  }, [entrySignals.signalMap]);
 
   const handleFetch = useCallback(async () => {
     const validationError = validateCandleRequest(form);
@@ -580,11 +565,9 @@ export function MarketChartApp() {
           <ContextOverlayControls visibility={contextOverlays} onChange={setContextOverlays} />
           <EntryControls
             mode={entryMode}
-            backtestSignalMode={backtestSettings.signalMode}
             maxRiskAmount={maxRiskAmount}
             overlaysVisible={showSignalOverlays}
             onModeChange={setEntryMode}
-            onBacktestSignalModeChange={(signalMode) => handleBacktestSettingsChange({ ...backtestSettings, signalMode })}
             onMaxRiskAmountChange={setMaxRiskAmount}
             onOverlaysVisibleChange={setShowSignalOverlays}
           />
@@ -637,15 +620,6 @@ export function MarketChartApp() {
             />
           </div>
         </div>
-
-        <BacktestDashboard
-          result={backtestResult}
-          settings={backtestSettings}
-          hydrated={hasHydrated}
-          selectedTradeId={activeSelectedBacktestTrade?.tradeId ?? null}
-          onSettingsChange={handleBacktestSettingsChange}
-          onTradeSelect={handleBacktestTradeSelect}
-        />
       </div>
     </main>
   );
@@ -653,20 +627,16 @@ export function MarketChartApp() {
 
 function EntryControls({
   mode,
-  backtestSignalMode,
   maxRiskAmount,
   overlaysVisible,
   onModeChange,
-  onBacktestSignalModeChange,
   onMaxRiskAmountChange,
   onOverlaysVisibleChange,
 }: {
   mode: EntryMode;
-  backtestSignalMode: BacktestSettings["signalMode"];
   maxRiskAmount: number;
   overlaysVisible: boolean;
   onModeChange: (mode: EntryMode) => void;
-  onBacktestSignalModeChange: (mode: BacktestSettings["signalMode"]) => void;
   onMaxRiskAmountChange: (value: number) => void;
   onOverlaysVisibleChange: (value: boolean) => void;
 }) {
@@ -681,21 +651,10 @@ function EntryControls({
             onChange={(event) => {
               const nextMode = event.target.value as EntryMode;
               onModeChange(nextMode);
-              onBacktestSignalModeChange(nextMode);
             }}
             className="h-10 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-900"
           >
             {ENTRY_MODES.map((entryMode) => <option key={entryMode} value={entryMode}>{formatControlLabel(entryMode)}</option>)}
-          </select>
-        </label>
-        <label className="flex min-w-48 flex-col gap-1 text-sm font-medium text-slate-700">
-          Backtest mode
-          <select
-            value={backtestSignalMode}
-            onChange={(event) => onBacktestSignalModeChange(event.target.value as BacktestSettings["signalMode"])}
-            className="h-10 border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-900"
-          >
-            {BACKTEST_SIGNAL_MODES.map((modeValue) => <option key={modeValue} value={modeValue}>{formatControlLabel(modeValue)}</option>)}
           </select>
         </label>
         <label className="flex w-40 flex-col gap-1 text-sm font-medium text-slate-700">
